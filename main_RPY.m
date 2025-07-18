@@ -6,7 +6,10 @@ function [Filament, t] = main_RPY(a,ds,Ns,SN,m_0,k_b,phi,mu,KB,KT,wall,dtfac,num
 %
 %   It simulates the three-dimensional motion of a single free-swimming flagellum (modelled as an internally-driven Kirchhoff rod) immersed in viscous fluid.
 
-       
+% Toggles for plotting and printing results to the terminal   
+print_results = true
+plot_filament = true
+
 % Filament data
 weight_per_unit_length = 0;         % weight per unit length of the filament 
 L = ds*Ns;                          % total length            
@@ -43,30 +46,26 @@ for nt = 1:TOTAL_STEPS
     iter = 0;
 
     p_broy = max_broyden_steps + 1;
-    Cmat = zeros(Nbroy,p_broy); % c and d vectors from Alg 2, Line 7. Their 
-    Dmat = zeros(Nbroy,p_broy); % value at each iteration is stored.
+    Cmat = zeros(Nbroy,p_broy); 
+    Dmat = zeros(Nbroy,p_broy); 
     
     frame_start = tic;    
     
-    % Aim of this is to update positions
+    % Update positions based on initial guess
     Filament = InitialGuess(Filament);
     Filament = RobotArm(Filament);
    
-    % Calculate mA vector
+    % Calculate the active moment vector
     Filament = ActiveST(Filament,omega_b, k_b, phi, m_0, t);
     
-    % Change preferred curvature
-    % Find f(X_k) and place into ERROR_VECk.
-    % If ||ERROR_VECk|| < concheck_tol (= epsilon in Alg 2, Line 4),
-    % then concheck = 0. Else, 1.    
+    % Find f(X_k) and place into ERROR_VECk, the error vector
+    % If ||ERROR_VECk|| < concheck_tol, then concheck = 0. Else, 1.    
     [concheck,ERROR_VECk,Filament,FS] = F_RPY(Filament,mu,dt,nt,concheck_tol,wall); 
     
-    % Find approximate Jacobian J_0. Since this is found in filament-sized
-    % blocks, it is stored as property of the filament objects.
-    % For convenience, it's also LU-decomposed at this stage.
-    Filament = ConstructAndDecomposeJacobian(Filament,dt,mu);
+    % Update the guess using the Bad Broyden method, until ||ERROR_VECk|| < concheck_tol (concheck = 0)
+    % See paper by Schoeller et al. (referenced in header) for details.
     
-    % Find J_0^{-1} f(X_k)  (from Alg 2, Line 5)
+    Filament = ConstructAndDecomposeJacobian(Filament,dt,mu);
     J0invERROR_VECk = blockwise_backslash_jacobian(Filament, ERROR_VECk);    
      
     num_broydens_steps_required = 0;
@@ -85,9 +84,7 @@ for nt = 1:TOTAL_STEPS
                
         iter = iter + 1;
         
-        % (remaining lines are Alg 2, Line 7)
         y_vec = ERROR_VECk1 - ERROR_VECk;
-        
         J0invERROR_VECk1 = blockwise_backslash_jacobian(Filament, ...
                                                               ERROR_VECk1);
         
@@ -109,47 +106,39 @@ for nt = 1:TOTAL_STEPS
         running_total_count = running_total_count + 1;        
     end
     
-    % Step in time, step in time. Never need a reason, never need a rhyme..
+    % Step forward in time
     t = t + dt;    
     Filament = EndOfStepUpdate(Filament);
     
-    % Plot and save
-    save_now = save_now + 1;
-    if(nt>1 && nt<=floor(TOTAL_STEPS/4))
-        if mod(nt,1000*save_step)==0
-        save_to_file = true;
-        else
-        save_to_file = false;
+    % Print results to terminal
+    save_now = save_now + 1;    
+    if(save_now == save_step && print_results)
+        if nt == 1 
+          fprintf('dt, a, Ns, L, m0, SN, k_a, phi, mu, KB, KT, dtfac, tol \n');
+          fprintf('%.4e, %.6f, %.0f, %.4f, %.0f, %.0f, %.0f, %.0f, %.2f, %.2f, %.2f, %.4f, %.4f, %.4f, %.0f, %.0f, %.0f, %.0f, %.0f, %.0f, %.0f, %.2e \n',dt, a, Ns, L, m_0(1), m_0(2), m_0(3), m_0(4), SN(1), SN(2), SN(3), k_b(1), k_b(2), k_b(3), phi(1), phi(2), phi(3), mu, KB, KT, dtfac, concheck_tol);
         end
-    else 
-        save_to_file = true;
-    end
-    
-    if(save_now == save_step && save_to_file)
-        if nt == 1
-          fprintf('dt, a, Ns, L, m0, SN, k_a, phi, mu, KB, KT, NB, NT, dtfac, tol \n');
-          fprintf('%.4e, %.6f, %.0f, %.4f, %.0f, %.0f, %.0f, %.0f, %.2f, %.2f, %.2f, %.4f, %.4f, %.4f, %.0f, %.0f, %.0f, %.0f, %.0f, %.0f, %.0f, %.0f, %.0f, %.2e \n',dt, a, Ns, L, m_0(1), m_0(2), m_0(3), m_0(4), SN(1), SN(2), SN(3), k_b(1), k_b(2), k_b(3), phi(1), phi(2), phi(3), mu, KB, KT, NB, NT, dtfac, concheck_tol);
-        end
-        PrintToFile(Filament,t, FS);
+        PrintToFile(Filament,t);
     end    
     
     if save_now == save_step
         save_now = 0;
     end
-    
-%         % Plot
-%         com = mean(Filament.X,2);
-%         L = Filament.Length;
-%         x = Filament.X;
-%         plot3(x(1,:)/L,x(2,:)/L,x(3,:)/L,'-','LineWidth',10);
-%         pbaspect([1 1 1])
-%         xlim([com(1)/L-0.5,com(1)/L+0.5]);
-%         ylim([com(2)/L-0.5,com(2)/L+0.5]); 
-%         zlim([com(3)/L-0.5,com(3)/L+0.5]); 
-%         xlabel('(x-x_{COM})/L');
-%         ylabel('(y-y_{COM})/L');
-%         zlabel('(z-z_{COM})/L');
-%         pause(0.001);
+
+    % Plot
+    if plot_filament 
+       com = mean(Filament.X,2);
+       L = Filament.Length;
+       x = Filament.X;
+       plot3(x(1,:)/L,x(2,:)/L,x(3,:)/L,'-','LineWidth',10);
+       pbaspect([1 1 1])
+       xlim([com(1)/L-0.5,com(1)/L+0.5]);
+       ylim([com(2)/L-0.5,com(2)/L+0.5]); 
+       zlim([com(3)/L-0.5,com(3)/L+0.5]); 
+       xlabel('(x-x_{COM})/L');
+       ylabel('(y-y_{COM})/L');
+       zlabel('(z-z_{COM})/L');
+       pause(0.001);
+    end
     
     frame_time(nt) = toc(frame_start);
     iters(nt) = iter;
