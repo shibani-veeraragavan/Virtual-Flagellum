@@ -1,45 +1,25 @@
-function [filename, Filament, t] = main_RPY(a,DL_factor,Ns,SN,m_0,k_b,phi,mu,KB,KT,NB,NT,wall,dtfac,num_settling_times,datein,save_step,concheck_tol) %#codegen
-% MAIN  Supplementary code to 'Methods for suspensions of passive and
-%       active filaments', https://arxiv.org/abs/1903.12609 ,
-%       by SF Schoeller, AK Townsend, TA Westwood & EE Keaveny.
-%       Visit https://github.com/ekeaveny/filaments/ to find contact 
-%       details.
-%       This version: 7 May 2019
+function [Filament, t] = main_RPY(a,ds,Ns,SN,m_0,k_b,phi,mu,KB,KT,wall,dtfac,num_settling_times,outfilename,save_step,concheck_tol) %#codegen
+%   Supplementary code to 'Elastohydrodynamic mechanisms govern beat pattern transitions in eukaryotic flagella', by S Veeraragavan, F Yazdan Parast, R Nosrati, and R Prabhakar. 
+%   Access the paper at https://doi.org/10.1101/2024.02.04.578806.
+% 
+%   This code is built over the numerical methods developed and published by Schoeller et al. (J. Comp. Phys. 424, 2021), available at https://doi.org/10.1016/j.jcp.2020.109846. 
 %
-%   This code demonstrates the use of the method in simulating a
-%   single flexible filament falling under gravity.
-%
-%   It uses the 'EJBb' version of Broyden's method (Algorithm 2 in the
-%   paper) with a reduced 'robot arm' system of nonlinear equations.
+%   It simulates the three-dimensional motion of a single free-swimming flagellum (modelled as an internally-driven Kirchhoff rod) immersed in viscous fluid.
 
        
 % Filament data
-N_f = 1;                            % number of filaments
-Np = N_f*Ns;                        % total number of segments
-max_broyden_steps = 5*Np;
-weight_per_unit_length = 0;         % weight per unit length W %
-
-L = DL_factor*a*Ns;
-omega_b = [SN(1)^4/L^4/mu*KB, SN(2)^4/L^4/mu*KB, SN(3)^4/L^4/mu*KB];
-
-if wall <= 0
-    typeh = 'RPY';
-else
-    typeh = 'WRPY';
-end
-filename = sprintf('out-%s-Ns-%.0f-%s-S-%.0f-%.0f-%.0f-mo-%.0f-%.0f-%.0f-Style-%.0f-IF-%.0f-%.0f',datein,Ns,typeh,SN(1),SN(2),SN(3),m_0(1),m_0(2),m_0(3),m_0(4), NB, NT);
+weight_per_unit_length = 0;         % weight per unit length of the filament 
+L = ds*Ns;                          % total length            
+omega_b = [SN(1)^4/L^4/mu*KB, SN(2)^4/L^4/mu*KB, SN(3)^4/L^4/mu*KB];       % Beat frequency (3 components in the internal frame: {d1, d2, d3})
 
 % Initialise Filament
-Filament = struct('N_w',Ns,'KB',KB,'KT',KT*KB,'NB',NB*mu*L^4,'NT',NT*mu*L^4,'DL',DL_factor*a,'Length',L,'StrainTwist',zeros(3,Ns-1),'mA',zeros(3,Ns),'weight_per_unit_length',weight_per_unit_length,'R',a*ones(1,Ns),'X',zeros(3,Ns),'Xm1',zeros(3,Ns),'Xm2',zeros(3,Ns),'X1',zeros(6,1),'Q',zeros(Ns,12),'U',zeros(9,Ns),'V',zeros(6,Ns),'F',zeros(6,Ns),'Lambda',zeros(3,Ns-1),'Lmat',zeros(6*Ns,6*Ns),'Umat',zeros(6*Ns,6*Ns));
+Filament = struct('N_w',Ns,'KB',KB,'KT',KT*KB,'DL',ds,'Length',L,'StrainTwist',zeros(3,Ns-1),'weight_per_unit_length',weight_per_unit_length,'R',a*ones(1,Ns),'X',zeros(3,Ns),'Xm1',zeros(3,Ns),'Xm2',zeros(3,Ns),'X1',zeros(6,1),'Q',zeros(Ns,12),'U',zeros(9,Ns),'V',zeros(6,Ns),'F',zeros(6,Ns),'Lambda',zeros(3,Ns-1),'Lmat',zeros(6*Ns,6*Ns),'Umat',zeros(6*Ns,6*Ns));
 Filament = InitialSetup(Filament,[0;0;wall]);
-N = 6*Filament.N_w;
-N = [0,cumsum(N)];
-Nbroy = N(end);
 
-% Time
-unit_time = mu*L^4/KB; % 1 unit time, T_VE
-dtve = mu*(DL_factor*a)^4/KB;
-dtva = mu*(DL_factor*a)^3*L/KB/max(m_0);
+% Choose timescale
+unit_time = mu*L^4/KB; % 1 unit time: viscoelastic timescale
+dtve = mu*(ds)^4/KB;   % Smallest viscoelastic timescale
+dtva = mu*(ds)^3*L/KB/max(m_0); % Smallest viscous-active timescale
 dt = min([dtve dtva]);
 steps_per_unit_time = unit_time/dt;
 TOTAL_STEPS = floor(num_settling_times*steps_per_unit_time);
@@ -48,10 +28,15 @@ t = 0;
 save_now = save_step - 1;
 
 % Time and iteration counts
+N = 6*Filament.N_w;
+N = [0,cumsum(N)];
+Nbroy = N(end);
+max_broyden_steps = 5*Ns;
 frame_time = zeros(TOTAL_STEPS,1);
 iters = zeros(TOTAL_STEPS,1);       % Number of Broyden's iterations
 running_total_count = 0;            % For average number of Broyden's iters
 
+% Time Integration - Main Simulation Loop
 
 i = 1;
 for nt = 1:TOTAL_STEPS  
