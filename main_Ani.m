@@ -1,4 +1,4 @@
-function [Filament, t] = main_Ani(a,ds,Ns,SN,m_0,k_b,phi,mu,KB,KT,wall,dtfac,num_settling_times,outfilename,save_step,concheck_tol) %#codegen
+function [Filament, t] = main_Ani(a,ds,Ns,S,A,k,mu,KB,KT,wall,dt,num_beat_cycles,save_step,concheck_tol) %#codegen
 %   Supplementary code to 'Elastohydrodynamic mechanisms govern beat pattern transitions in eukaryotic flagella', by S Veeraragavan, F Yazdan Parast, R Nosrati, and R Prabhakar. 
 %   Access the paper at https://doi.org/10.1101/2024.02.04.578806.
 % 
@@ -13,22 +13,15 @@ plot_filament = true
 % Filament data
 weight_per_unit_length = 0;         % weight per unit length of the filament 
 L = ds*Ns;                          % total length            
-omega_b = [SN(1)^4/L^4/mu*KB, SN(2)^4/L^4/mu*KB, SN(3)^4/L^4/mu*KB];       % Beat frequency (3 components in the internal frame: {d1, d2, d3})
+omega_b = [S(1)^4/L^4/mu*KB, S(2)^4/L^4/mu*KB, S(3)^4/L^4/mu*KB];       % Beat frequency (3 components in the internal frame: {d1, d2, d3})
 
 % Initialise Filament
 Filament = struct('N_w',Ns,'KB',KB,'KT',KT*KB,'DL',ds,'Length',L,'StrainTwist',zeros(3,Ns-1),'weight_per_unit_length',weight_per_unit_length,'R',a*ones(1,Ns),'X',zeros(3,Ns),'Xm1',zeros(3,Ns),'Xm2',zeros(3,Ns),'X1',zeros(6,1),'Q',zeros(Ns,12),'U',zeros(9,Ns),'V',zeros(6,Ns),'F',zeros(6,Ns),'Lambda',zeros(3,Ns-1),'Lmat',zeros(6*Ns,6*Ns),'Umat',zeros(6*Ns,6*Ns));
 Filament = InitialSetup(Filament,[0;0;wall]);
 
-% Choose timescale
-unit_time = mu*L^4/KB; % 1 unit time: viscoelastic timescale
-dtve = mu*(ds)^4/KB;   % Smallest viscoelastic timescale
-dtva = mu*(ds)^3*L/KB/max(m_0); % Smallest viscous-active timescale
-dt = min([dtve dtva]);
-steps_per_unit_time = unit_time/dt;
-TOTAL_STEPS = floor(num_settling_times*steps_per_unit_time);
-
-t = 0;
-save_now = save_step - 1;
+% Total running time
+beat_period = 2*pi/max(S)^4; % 1 beat cycle
+TOTAL_STEPS = floor(no_beat_cycles*beat_period/dt);
 
 % Time and iteration counts
 N = 6*Filament.N_w;
@@ -40,6 +33,9 @@ iters = zeros(TOTAL_STEPS,1);       % Number of Broyden's iterations
 running_total_count = 0;            % For average number of Broyden's iters
 
 % Time Integration - Main Simulation Loop
+
+t = 0;
+save_now = save_step - 1;
 
 i = 1;
 for nt = 1:TOTAL_STEPS  
@@ -56,7 +52,7 @@ for nt = 1:TOTAL_STEPS
     Filament = RobotArm(Filament);
    
     % Calculate the active moment vector
-    Filament = ActiveST(Filament,omega_b, k_b, phi, m_0, t);
+    Filament = ActiveST(Filament,omega_b, k, A, t);
     
     % Find f(X_k) and place into ERROR_VECk, the error vector
     % If ||ERROR_VECk|| < concheck_tol, then concheck = 0. Else, 1.    
@@ -114,8 +110,8 @@ for nt = 1:TOTAL_STEPS
     save_now = save_now + 1;    
     if(save_now == save_step && print_results)
         if nt == 1 
-          fprintf('dt, a, Ns, L, m0, SN, k_a, phi, mu, KB, KT, dtfac, tol \n');
-          fprintf('%.4e, %.6f, %.0f, %.4f, %.0f, %.0f, %.0f, %.0f, %.2f, %.2f, %.2f, %.4f, %.4f, %.4f, %.0f, %.0f, %.0f, %.0f, %.0f, %.0f, %.0f, %.2e \n',dt, a, Ns, L, m_0(1), m_0(2), m_0(3), m_0(4), SN(1), SN(2), SN(3), k_b(1), k_b(2), k_b(3), phi(1), phi(2), phi(3), mu, KB, KT, dtfac, concheck_tol);
+          fprintf('dt, a, Ns, L, A, S, k, mu, KB, KT, dtfac, tol \n');
+          fprintf('%.4e, %.6f, %.0f, %.4f, %.0f, %.0f, %.0f, %.2f, %.2f, %.2f, %.4f, %.4f, %.4f, %.0f, %.0f, %.0f, %.0f, %.2e \n',dt, a, Ns, L, A(1), A(2), A(3), S(1), S(2), S(3), k(1), k(2), k(3), mu, KB, KT, dtfac, concheck_tol);
         end
         PrintToFile(Filament,t);
     end    
