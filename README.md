@@ -7,6 +7,7 @@ The following two lines generate a MEX-function for main_RPY called main_RPY_mex
 Before running the lines below, please comment out lines in main_RPY (or main_Ani) as plotting is not supported during MEX-function generation.
 
   ins = {a,ds,Ns,S,A,k,mu,KB,KT,wall,dt,0.01,save_step,concheck_tol}
+  
   codegen main_RPY -args ins
 
 Following this, in Example_Script.m, line, "main_RPY" can be replaced with "main_RPY_mex" to achieve a much shorter running time.
