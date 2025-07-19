@@ -1,4 +1,4 @@
-function [Filament, t] = main_RPY(a,ds,Ns,S,A,k,mu,KB,KT,wall,dt,num_beat_cycles,save_step,concheck_tol) %#codegen
+function [Filament, t] = main_RPY(a,ds,Ns,S,A,k,mu,KB,KT,wall,dt,no_beat_cycles,save_step,concheck_tol) %#codegen
 %   Supplementary code to 'Elastohydrodynamic mechanisms govern beat pattern transitions in eukaryotic flagella', by S Veeraragavan, F Yazdan Parast, R Nosrati, and R Prabhakar. 
 %   Access the paper at https://doi.org/10.1101/2024.02.04.578806.
 % 
@@ -7,8 +7,8 @@ function [Filament, t] = main_RPY(a,ds,Ns,S,A,k,mu,KB,KT,wall,dt,num_beat_cycles
 %   It simulates the three-dimensional motion of a single free-swimming flagellum (modelled as an internally-driven Kirchhoff rod) immersed in viscous fluid.
 
 % Toggles for plotting and printing results to the terminal   
-print_results = true
-plot_filament = true
+print_results = true;
+plot_filament = true;
 
 % Filament data
 weight_per_unit_length = 0;         % weight per unit length of the filament 
@@ -56,7 +56,7 @@ for nt = 1:TOTAL_STEPS
     
     % Find f(X_k) and place into ERROR_VECk, the error vector
     % If ||ERROR_VECk|| < concheck_tol, then concheck = 0. Else, 1.    
-    [concheck,ERROR_VECk,Filament,FS] = F_RPY(Filament,mu,dt,nt,concheck_tol,wall); 
+    [concheck,ERROR_VECk,Filament] = F_RPY(Filament,mu,dt,nt,concheck_tol,wall); 
     
     % Update the guess using the Bad Broyden method, until ||ERROR_VECk|| < concheck_tol (concheck = 0)
     % See paper by Schoeller et al. (referenced in header) for details.
@@ -76,7 +76,7 @@ for nt = 1:TOTAL_STEPS
         
         % Check to see if the new state is an acceptable solution:
         % ERROR_VECk1 = f(X_(k+1))        
-        [concheck,ERROR_VECk1,Filament,FS] = F_RPY(Filament,mu,dt,nt,concheck_tol,wall);     
+        [concheck,ERROR_VECk1,Filament] = F_RPY(Filament,mu,dt,nt,concheck_tol,wall);     
                
         iter = iter + 1;
         
@@ -110,8 +110,8 @@ for nt = 1:TOTAL_STEPS
     save_now = save_now + 1;    
     if(save_now == save_step && print_results)
         if nt == 1 
-          fprintf('dt, a, Ns, L, A, S, k, mu, KB, KT, dtfac, tol \n');
-          fprintf('%.4e, %.6f, %.0f, %.4f, %.0f, %.0f, %.0f, %.2f, %.2f, %.2f, %.4f, %.4f, %.4f, %.0f, %.0f, %.0f, %.0f, %.2e \n',dt, a, Ns, L, A(1), A(2), A(3), S(1), S(2), S(3), k(1), k(2), k(3), mu, KB, KT, dtfac, concheck_tol);
+          fprintf('dt, a, Ns, L, A, S, k, mu, KB, KT, dt, tol \n');
+          fprintf('%.4e, %.6f, %.0f, %.4f, %.0f, %.0f, %.0f, %.2f, %.2f, %.2f, %.4f, %.4f, %.4f, %.0f, %.0f, %.0f, %.2e, %.2e \n',dt, a, Ns, L, A(1), A(2), A(3), S(1), S(2), S(3), k(1), k(2), k(3), mu, KB, KT, dt, concheck_tol);
         end
         PrintToFile(Filament,t);
     end    
