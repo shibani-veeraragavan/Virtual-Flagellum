@@ -1,19 +1,7 @@
 function Filament = RPY_Wall(Filaments,mu,wall)
-% RPY  Solves the Stokes flow problem using the Rotne-Prager-Yamakawa
-%      tensor.
-%
-%   RPY(Filaments,mu)
-%   sets the velocities and angular velocities of the Filament objects
-%   for given forces and torques, for spherical particles, i, of radius 
-%   Filament.R(i) at positions Filament.X(i) in an unbounded Newtonian 
-%   fluid of viscosity mu.
-%
-%   Details of RPY solver: Wajnryb et al., 2013 Journal of Fluid Mechanics,
-%   "Generalization of the Rotne-Prager-Yamakawa mobility and shear
-%   disturbance tensors".
-%
-%   These expressions correpond to equations (23)-(26) in the paper.
-
+% Computes the translational and angular velocities of the filament's segments given the forces and torques 
+% using the Rotne-Prager-Yamakawa tensor for spherical particles in free space or half-space bounded by a 
+% plane wall. For the form of the tensor, see Swan and Brady, Phys. Fluids 19, 113306 (2007).
 
 N = length(Filaments);
 
