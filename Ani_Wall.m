@@ -1,227 +1,61 @@
-function Filament = Ani_Wall(Filaments,mu,wall)
-% RPY  Solves the Stokes flow problem using the Rotne-Prager-Yamakawa
-%      tensor.
-%
-%   RPY(Filaments,mu)
-%   sets the velocities and angular velocities of the Filament objects
-%   for given forces and torques, for spherical particles, i, of radius 
-%   Filament.R(i) at positions Filament.X(i) in an unbounded Newtonian 
-%   fluid of viscosity mu.
-%
-%   Details of RPY solver: Wajnryb et al., 2013 Journal of Fluid Mechanics,
-%   "Generalization of the Rotne-Prager-Yamakawa mobility and shear
-%   disturbance tensors".
-%
-%   These expressions correpond to equations (23)-(26) in the paper.
+function Filament = Ani_Wall(Filament,mu,wall)
+% Computes the translational and angular velocities of the filament's segments given the forces and torques 
+% using Resistive Force Theory, with coefficients as provided by Lighthill, SIAM Review 18, 161–230 (1976) 
+% and Katz et al., J Fluid Mech 72, 529 (1975). 
 
+L = Filament.Length;
+dL = Filament.DL;
+Xi = Filament.X;
+Ri = Filament.R;
+qi = Filament.Q;
 
-N = length(Filaments);
-L = Filaments(1).Length;
-dL = Filaments(1).DL;
-for i=1:N
-    
-    Xi = Filaments(i).X;
-    
-    Ri = Filaments(i).R;
-    
-    V = zeros(3,Filaments(i).N_w);
-    
-    Omega = zeros(3,Filaments(i).N_w);
-    
-    qi = Filaments(i).Q; 
-    
-    j = i;
-    
-%     for j=1:N
-%         
-%         Xj = Filaments(j).X;
-%         
-        Fj = Filaments(j).F(1:3,:);
+Fi = Filament.F(1:3,:);
+Ti = Filament.F(4:6,:);
+
+% Initialise velocity vectors
+V = zeros(3,Filament.N_w);
+Omega = zeros(3,Filament.N_w);
         
-        Tj = Filaments(j).F(4:6,:);
-        
-        Rj = Filaments(j).R;
-        
-        for m=1:Filaments(i).N_w
-            
-%             Xm = Xi(:,m);
-            
-            am = Ri(m);
-            
-            n=m;
-%             
-%             for n=1:Filaments(j).N_w
-%                 
-                Xn = Xi(:,n);
+for m=1:Filament.N_w
 
+    a = Ri(m);
+    Xn = Xi(:,m);
+    F = Fi(:,m);
+    T = Ti(:,m);
 
-%                 r = ((Xm(1) - Xn(1))*(Xm(1) - Xn(1)) + (Xm(2) - Xn(2))*(Xm(2) - Xn(2)) + (Xm(3) - Xn(3))*(Xm(3) - Xn(3)))^0.5 + 10^-16;
-%                 
-%                 rhat = (Xm - Xn)/r;
-%                 
-                F = Fj(:,n);
-                
-                T = Tj(:,n);
-%                 
-                an = Rj(n);
-%                 
-                amax = max(am,an);
-%                 
-%                 amin = min(am,an);
-%                 
-%                 if r > (am + an) % The particles don't overlap.
-%                     
-%                     %~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-%                     
-%                     % We begin with the translation-translation mobility.
-%                     
-%                     a0 = 1/(8*pi*mu*r);
-%                     a1 = 1 + (am*am + an*an)/(3*r*r);
-%                     a2 = 1 - (am*am + an*an)/(r*r);
-%                     
-%                     dot = F(1)*rhat(1) + F(2)*rhat(2) + F(3)*rhat(3);
-%                     
-%                     V(1,m) = V(1,m) + a0*(a1*F(1) + a2*dot*rhat(1));
-%                     V(2,m) = V(2,m) + a0*(a1*F(2) + a2*dot*rhat(2));
-%                     V(3,m) = V(3,m) + a0*(a1*F(3) + a2*dot*rhat(3));
-%                     
-%                     %~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-%                     
-%                     % Next, we look at the rotation-rotation mobility.
-%                     
-%                     a0 = 1/(16*pi*mu*(r^3));
-%                     
-%                     dot = T(1)*rhat(1) + T(2)*rhat(2) + T(3)*rhat(3);
-%                     
-%                     Omega(1,m) = Omega(1,m) + a0*(3*dot*rhat(1) - T(1));
-%                     Omega(2,m) = Omega(2,m) + a0*(3*dot*rhat(2) - T(2));
-%                     Omega(3,m) = Omega(3,m) + a0*(3*dot*rhat(3) - T(3));
-%                     
-%                     %~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-%                     
-%                     % Finally, we examine the translation-rotation mobilities.
-%                     
-%                     a0 = 1/(8*pi*mu*r*r);
-%                     
-%                     V(1,m) = V(1,m) + a0*(T(2)*rhat(3) - T(3)*rhat(2));
-%                     V(2,m) = V(2,m) + a0*(T(3)*rhat(1) - T(1)*rhat(3));
-%                     V(3,m) = V(3,m) + a0*(T(1)*rhat(2) - T(2)*rhat(1));
-%                     
-%                     Omega(1,m) = Omega(1,m) + a0*(F(2)*rhat(3) - F(3)*rhat(2));
-%                     Omega(2,m) = Omega(2,m) + a0*(F(3)*rhat(1) - F(1)*rhat(3));
-%                     Omega(3,m) = Omega(3,m) + a0*(F(1)*rhat(2) - F(2)*rhat(1));
-%                     
-%                     %~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-%                     
-%                 elseif r > (amax - amin) % i.e. amax - amin < rij <= ai + aj
-%                     
-%                     %~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-%                     
-%                     % We begin with the translation-translation mobility.
-%                     
-%                     a0 = 1/(6*pi*mu*am*an);
-%                     a1 = (16*(am + an)*r^3 - ((am - an)^2 + 3*r*r)^2)/(32*r^3);
-%                     a2 = (3*((am - an)^2 - r*r)^2)/(32*r^3);
-%                     
-%                     dot = F(1)*rhat(1) + F(2)*rhat(2) + F(3)*rhat(3);
-%                     
-%                     V(1,m) = V(1,m) + a0*(a1*F(1) + a2*dot*rhat(1));
-%                     V(2,m) = V(2,m) + a0*(a1*F(2) + a2*dot*rhat(2));
-%                     V(3,m) = V(3,m) + a0*(a1*F(3) + a2*dot*rhat(3));
-%                     
-%                     %~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-%                     
-%                     % Next, we look at the rotation-rotation mobility.
-%                     
-%                     a0 = 1/(8*pi*mu*(am*an)^3);
-%                     A = (5*r^6 - 27*r^4*(am*am + an*an) + 32*r^3*(am^3 + an^3)...
-%                         -9*r*r*(am*am - an*an)^2 - (am - an)^4*(am*am + 4*am*an + an*an))/(64*r^3);
-%                     B = 3*((am - an)^2 - r*r)^2*(am*am + 4*am*an + an*an - r*r)/(64*r^3);
-%                     
-%                     dot = T(1)*rhat(1) + T(2)*rhat(2) + T(3)*rhat(3);
-%                     
-%                     Omega(1,m) = Omega(1,m) + a0*(B*dot*rhat(1) + A*T(1));
-%                     Omega(2,m) = Omega(2,m) + a0*(B*dot*rhat(2) + A*T(2));
-%                     Omega(3,m) = Omega(3,m) + a0*(B*dot*rhat(3) + A*T(3));
-%                     
-%                     %~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-%                     
-%                     % Finally, we examine the translation-rotation mobilities.
-%                     
-%                     a0 = (1/(16*pi*mu*an*am^3))*((an*an + 2*an*(am + r) - 3*(am - r)^2)*(am - an + r)^2)/(8*r*r);
-%                     
-%                     V(1,m) = V(1,m) + a0*(T(2)*rhat(3) - T(3)*rhat(2));
-%                     V(2,m) = V(2,m) + a0*(T(3)*rhat(1) - T(1)*rhat(3));
-%                     V(3,m) = V(3,m) + a0*(T(1)*rhat(2) - T(2)*rhat(1));
-%                     
-%                     Omega(1,m) = Omega(1,m) + a0*(F(2)*rhat(3) - F(3)*rhat(2));
-%                     Omega(2,m) = Omega(2,m) + a0*(F(3)*rhat(1) - F(1)*rhat(3));
-%                     Omega(3,m) = Omega(3,m) + a0*(F(1)*rhat(2) - F(2)*rhat(1));
-%                     
-%                     %~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-%                     
-%                     
-%                 else % i.e. 0 <= rij <= amax - amin
-%                     
-%                     V(1,m) = V(1,m) + F(1)/(6*pi*mu*amax);
-%                     V(2,m) = V(2,m) + F(2)/(6*pi*mu*amax);
-%                     V(3,m) = V(3,m) + F(3)/(6*pi*mu*amax);
-                    if wall>0 
-                        h = Xn(3); % Height above wall at z=0, positive half-space
-                        if h/L>10
-                            Ct_inv = log(2*L/an)/(2*pi*mu*dL);
-                            Cn_inv = (log(2*L/an)+0.5)/(4*pi*mu*dL);
-                        elseif h/L<=10 && h/L>1 
-                            Ct_inv = (log(2/an)-0.807-3*L/8/h)/(2*pi*mu*dL);
-                            Cn_inv = (log(2/an)+0.193-3*L/4/h)/(4*pi*mu*dL);
-                        else
-                            Ct_inv = log(2*h/an)/(2*pi*mu*dL);
-                            Cn_inv = log(2*h/an)/(4*pi*mu*dL);
-                        end
-                    else
-                        Ct_inv = log(0.09*L/an)/(2*pi*mu*dL);
-                        Cn_inv = (log(0.09*L/an)+0.5)/(4*pi*mu*dL);
-                    end
-                    
-                    qm = qi(m,1:4);
-%                     
-                    d1m = QuaternionRotation(qm,[1;0;0]);
-                    d2m = QuaternionRotation(qm,[0;1;0]);
-                    d3m = QuaternionRotation(qm,[0;0;1]);
-                    Fvec = [sum(F.*d1m)*Ct_inv; sum(F.*d2m)*Cn_inv; sum(F.*d3m)*Cn_inv];
-                     
-                    V(1:3,m) = QuaternionRotation(qm, Fvec);
-
-                    Omega(1,m) = Omega(1,m) + T(1)/(8*pi*mu*amax^3);
-                    Omega(2,m) = Omega(2,m) + T(2)/(8*pi*mu*amax^3);
-                    Omega(3,m) = Omega(3,m) + T(3)/(8*pi*mu*amax^3);
-                    
-%                     hx = 0;
-%                     if am-an > 0
-%                         hx = 1;
-%                     elseif am-an ==0
-%                             hx = 0.5;
-%                     end
-%                     tr_fac = hx*r/(8*pi*mu*am^3);
-%                     
-%                     V(1,m) = V(1,m) + tr_fac*(T(2)*rhat(3) - T(3)*rhat(2));
-%                     V(2,m) = V(2,m) + tr_fac*(T(3)*rhat(1) - T(1)*rhat(3));
-%                     V(3,m) = V(3,m) + tr_fac*(T(1)*rhat(2) - T(2)*rhat(1));
-%                     
-%                     Omega(1,m) = Omega(1,m) + tr_fac*(F(2)*rhat(3) - F(3)*rhat(2));
-%                     Omega(2,m) = Omega(2,m) + tr_fac*(F(3)*rhat(1) - F(1)*rhat(3));
-%                     Omega(3,m) = Omega(3,m) + tr_fac*(F(1)*rhat(2) - F(2)*rhat(1));
-                    
-%                 end % End overlap check.
-                
-%             end
-            
+    if wall>0
+        % Use wall coefficients of Katz et al.
+        h = Xn(3); % Height above wall at z=0, positive half-space
+        if h/L>10
+            Ct_inv = log(2*L/a)/(2*pi*mu*dL);
+            Cn_inv = (log(2*L/a)+0.5)/(4*pi*mu*dL);
+        elseif h/L<=10 && h/L>1
+            Ct_inv = (log(2/a)-0.807-3*L/8/h)/(2*pi*mu*dL);
+            Cn_inv = (log(2/a)+0.193-3*L/4/h)/(4*pi*mu*dL);
+        else
+            Ct_inv = log(2*h/a)/(2*pi*mu*dL);
+            Cn_inv = log(2*h/a)/(4*pi*mu*dL);
         end
-        
-%     end
+    else
+        % Use free-space coefficients of Lighthill
+        Ct_inv = log(0.09*L/a)/(2*pi*mu*dL);
+        Cn_inv = (log(0.09*L/a)+0.5)/(4*pi*mu*dL);
+    end
+
+    qm = qi(m,1:4);
+    d1m = QuaternionRotation(qm,[1;0;0]);
+    d2m = QuaternionRotation(qm,[0;1;0]);
+    d3m = QuaternionRotation(qm,[0;0;1]);
     
-    Filaments(i).V(:,:) = [V;Omega];
-    
+    Fvec = [sum(F.*d1m)*Ct_inv; sum(F.*d2m)*Cn_inv; sum(F.*d3m)*Cn_inv];
+    V(1:3,m) = QuaternionRotation(qm, Fvec);
+
+    Omega(1,m) = Omega(1,m) + T(1)/(8*pi*mu*amax^3);
+    Omega(2,m) = Omega(2,m) + T(2)/(8*pi*mu*amax^3);
+    Omega(3,m) = Omega(3,m) + T(3)/(8*pi*mu*amax^3);
+
 end
-Filament = Filaments(1);
-end % End function.
+
+Filament.V(:,:) = [V;Omega];
+
+end
