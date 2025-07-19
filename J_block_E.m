@@ -11,9 +11,9 @@ E = zeros(3*N_w);
 
 DL = Filament.DL;
 
-KB = Filament.KB + 3*Filament.NB/dt;
+KB = Filament.KB;
 
-KT = Filament.KT + 3*Filament.NT/dt;
+KT = Filament.KT;
 
 strain_twist = Filament.StrainTwist;
 
