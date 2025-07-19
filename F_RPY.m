@@ -1,4 +1,4 @@
-function [concheck_local,ERROR_VECk1_local,Filament, FS] = F_RPY(Filament,mu,dt,nt,tol,wall)
+function [concheck_local,ERROR_VECk1_local,Filament] = F_RPY(Filament,mu,dt,nt,tol,wall)
 % F  places forces and torques on the segments, calculates the resultant
 %    velocities and angular velocities, and forms the error vector f(X*).
 %    Then checks convergence. For details, see docstrings of functions
